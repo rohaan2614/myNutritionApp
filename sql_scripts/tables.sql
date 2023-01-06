@@ -1,11 +1,9 @@
 -- create blank userbase 
 DROP DATABASE IF EXISTS MyNutrition;
-
 CREATE DATABASE MyNutrition;
-
 USE MyNutrition;
 
--- CREATE DATABASE 
+-- CREATE DATABASE
 CREATE TABLE ingredient (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -39,29 +37,23 @@ CREATE TABLE recipeNutrition (
     CONSTRAINT FK_recipe_recipeNutrition FOREIGN KEY (recipeID) REFERENCES recipe(id)
 );
 
-delimiter / / CREATE TRIGGER newRecipe
-AFTER
-INSERT
-    ON recipe FOR EACH ROW BEGIN DECLARE lastRecipeID INT;
-
-SELECT
-    id
-FROM
-    recipe
-ORDER BY
-    id DESC
-LIMIT
-    1 INTO lastRecipeID;
-
-INSERT INTO
-    recipeNutrition (recipeID)
-VALUES
-    (lastRecipeID);
-
-END;
-
-delimiter;
-
+delimiter //
+CREATE TRIGGER newRecipe 
+	AFTER INSERT
+	ON recipe
+	FOR EACH ROW
+	BEGIN
+        SET @lastRecipeID = 0;
+		SELECT id 
+        FROM recipe
+        ORDER BY id DESC
+        LIMIT 1
+        INTO @lastRecipeID;
+		INSERT INTO recipeNutrition (recipeID)
+					VALUES (@lastRecipeID);
+	END;
+    //
+delimiter ;
 -- CREATE TRIGGER updateRecipeNutrition 
 -- 	AFTER INSERT 
 --     ON recipeIngredient 
