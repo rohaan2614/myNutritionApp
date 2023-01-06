@@ -12,6 +12,7 @@ CREATE TABLE ingredient (
     fat FLOAT DEFAULT 0.0,
     protein FLOAT DEFAULT 0.0,
     carbohydrates FLOAT DEFAULT 0.0,
+    sodium FLOAT DEFAULT 0.0,
     weblink VARCHAR(255)
 );
 
@@ -20,20 +21,12 @@ CREATE TABLE recipe (
     name VARCHAR(100) NOT NULL
 );
 
-CREATE TABLE recipeIngredient(
-    recipeID INT,
-    ingredientID INT,
-    ingredientQty FLOAT DEFAULT 0.0,
-    CONSTRAINT PK_recipeIngredient PRIMARY KEY (recipeID, ingredientID),
-    CONSTRAINT FK_recipe_recipeIngredient FOREIGN KEY (recipeID) REFERENCES recipe(id),
-    CONSTRAINT FK_ingredient_recipeIngredient FOREIGN KEY (ingredientID) REFERENCES ingredient(id)
-);
-
 CREATE TABLE recipeNutrition (
     recipeID INT,
     totalFat FLOAT DEFAULT 0.0,
     totalProtein FLOAT DEFAULT 0.0,
     totalCarbs FLOAT DEFAULT 0.0,
+    totalSodium FLOAT DEFAULT 0.0,
     CONSTRAINT FK_recipe_recipeNutrition FOREIGN KEY (recipeID) REFERENCES recipe(id)
 );
 
@@ -54,12 +47,42 @@ CREATE TRIGGER newRecipe
 	END;
     //
 delimiter ;
--- CREATE TRIGGER updateRecipeNutrition 
--- 	AFTER INSERT 
---     ON recipeIngredient 
---     FOR EACH ROW
--- 		UPDATE recipeNutrition
---         SET recipeNutrition.totalFat = recipeNutrition.totalFat + inserted.
+
+CREATE TABLE recipeIngredient(
+    recipeID INT,
+    ingredientID INT,
+    ingredientQty FLOAT DEFAULT 0.0,
+    CONSTRAINT PK_recipeIngredient PRIMARY KEY (recipeID, ingredientID),
+    CONSTRAINT FK_recipe_recipeIngredient FOREIGN KEY (recipeID) REFERENCES recipe(id),
+    CONSTRAINT FK_ingredient_recipeIngredient FOREIGN KEY (ingredientID) REFERENCES ingredient(id)
+);
+
+delimiter //
+CREATE TRIGGER updateRecipeNutrition 
+	AFTER INSERT 
+    ON recipeIngredient 
+    FOR EACH ROW
+    BEGIN
+		SELECT *
+        FROM recipeIngredient
+        ORDER BY recipeID DESC
+        LIMIT 1
+        INTO @recipeID, @ingredientID, @ingredientQty;
+        -- fat content
+        SELECT fat, protein, carbohydrates, sodium
+        FROM ingredient
+        WHERE id = @ingredientID
+        INTO @fatPerServing, @proteinPerServing, @carbsPerServing, @naPerServing;
+		UPDATE recipeNutrition
+        SET recipeNutrition.totalFat = recipeNutrition.totalFat + (@fatPerServing * @ingredientQty), 
+			recipeNutrition.totalProtein = recipeNutrition.totalProtein + (@proteinPerServing * @ingredientQty),
+			recipeNutrition.totalCarbs = recipeNutrition.totalCarbs + (@carbsPerServing * @ingredientQty),
+            recipeNutrition.totalSodium = recipeNutrition.totalSodium + (@naPerServing * @ingredientQty)
+        WHERE recipeNutrition.recipeID = @recipeID;
+        END;
+//
+delimiter ;
+
 CREATE TABLE recipeCost (
     recipeID INT,
     costPerServing DECIMAL(5, 2),
@@ -75,6 +98,7 @@ INSERT INTO
         fat,
         carbohydrates,
         protein,
+        sodium,
         weblink
     )
 VALUES
@@ -85,6 +109,7 @@ VALUES
         15,
         8,
         7,
+        135,
         'https://www.walmart.com/ip/Great-Value-Crunchy-Peanut-Butter-40-oz/10315478'
     ),
     (
@@ -94,6 +119,7 @@ VALUES
         2,
         23,
         5,
+        170,
         'https://www.walmart.com/ip/Great-Value-Multi-Grain-Bread-24-oz/46491799'
     ),
     (
@@ -103,25 +129,19 @@ VALUES
         11,
         22,
         2,
+        15,
         'https://www.walmart.com/ip/Nutella-Hazelnut-Spread-with-Cocoa-for-Breakfast-Great-for-Holiday-Baking-26-5-oz-Jar/14574564'
     );
 
-INSERT INTO
-    recipe (name)
-VALUES
-    ('Peanut Butter-Nutella Sandwich');
+INSERT INTO recipe (name)
+			VALUES ('Peanut Butter-Nutella Sandwich');
 
-SELECT
-    *
-FROM
-    ingredient;
+SELECT * FROM ingredient;
 
-SELECT
-    *
-FROM
-    recipe;
+SELECT * FROM recipe;
 
-SELECT
-    *
-FROM
-    recipeNutrition;
+INSERT INTO recipeIngredient
+			VALUES (1, 1, 2);
+
+SELECT * FROM recipeNutrition;
+    
