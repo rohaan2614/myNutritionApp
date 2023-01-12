@@ -34,30 +34,23 @@ CREATE TABLE recipeNutrition (
     CONSTRAINT FK_recipe_recipeNutrition FOREIGN KEY (recipeID) REFERENCES recipe(id)
 );
 
-delimiter / / CREATE TRIGGER newRecipe
-AFTER
-INSERT
-    ON recipe FOR EACH ROW BEGIN
-SET
-    @lastRecipeID = 0;
-
-SELECT
-    id
-FROM
-    recipe
-ORDER BY
-    id DESC
-LIMIT
-    1 INTO @lastRecipeID;
-
-INSERT INTO
-    recipeNutrition (recipeID)
-VALUES
-    (@lastRecipeID);
-
-END;
-
-/ / delimiter;
+delimiter //
+CREATE TRIGGER newRecipe 
+	AFTER INSERT
+	ON recipe
+	FOR EACH ROW
+	BEGIN
+        SET @lastRecipeID = 0;
+		SELECT id 
+        FROM recipe
+        ORDER BY id DESC
+        LIMIT 1
+        INTO @lastRecipeID;
+		INSERT INTO recipeNutrition (recipeID)
+					VALUES (@lastRecipeID);
+	END;
+    //
+delimiter ;
 
 CREATE TABLE recipeIngredient(
     recipeID INT,
@@ -68,51 +61,33 @@ CREATE TABLE recipeIngredient(
     CONSTRAINT FK_ingredient_recipeIngredient FOREIGN KEY (ingredientID) REFERENCES ingredient(id)
 );
 
-delimiter / / CREATE TRIGGER updateRecipeNutrition
-AFTER
-INSERT
-    ON recipeIngredient FOR EACH ROW BEGIN
-SELECT
-    *
-FROM
-    recipeIngredient
-ORDER BY
-    recipeID DESC
-LIMIT
-    1 INTO @recipeID,
-    @ingredientID,
-    @ingredientQty;
-
--- fat content
-SELECT
-    fat,
-    protein,
-    carbohydrates,
-    sodium
-FROM
-    ingredient
-WHERE
-    id = @ingredientID INTO @fatPerServing,
-    @proteinPerServing,
-    @carbsPerServing,
-    @naPerServing;
-
-UPDATE
-    recipeNutrition
-SET
-    recipeNutrition.totalFat = recipeNutrition.totalFat + (@fatPerServing * @ingredientQty),
-    recipeNutrition.totalProtein = recipeNutrition.totalProtein + (@proteinPerServing * @ingredientQty),
-    recipeNutrition.totalCarbs = recipeNutrition.totalCarbs + (@carbsPerServing * @ingredientQty),
-    recipeNutrition.totalSodium = recipeNutrition.totalSodium + (@naPerServing * @ingredientQty),
-    recipeNutrition.totalCalories = (recipeNutrition.totalFat * 8) + 4 * (
-        recipeNutrition.totalProtein + recipeNutrition.totalCarbs
-    )
-WHERE
-    recipeNutrition.recipeID = @recipeID;
-
-END;
-
-/ / delimiter;
+delimiter //
+CREATE TRIGGER updateRecipeNutrition 
+	AFTER INSERT 
+    ON recipeIngredient 
+    FOR EACH ROW
+    BEGIN
+		SELECT *
+        FROM recipeIngredient
+        ORDER BY recipeID DESC
+        LIMIT 1
+        INTO @recipeID, @ingredientID, @ingredientQty;
+        -- fat content
+        SELECT fat, protein, carbohydrates, sodium
+        FROM ingredient
+        WHERE id = @ingredientID
+        INTO @fatPerServing, @proteinPerServing, @carbsPerServing, @naPerServing;
+		UPDATE recipeNutrition
+        SET recipeNutrition.totalFat = recipeNutrition.totalFat + (@fatPerServing * @ingredientQty), 
+			recipeNutrition.totalProtein = recipeNutrition.totalProtein + (@proteinPerServing * @ingredientQty),
+			recipeNutrition.totalCarbs = recipeNutrition.totalCarbs + (@carbsPerServing * @ingredientQty),
+            recipeNutrition.totalSodium = recipeNutrition.totalSodium + (@naPerServing * @ingredientQty),
+			recipeNutrition.totalCalories = (recipeNutrition.totalFat * 8) + 4 * (
+				recipeNutrition.totalProtein + recipeNutrition.totalCarbs)
+        WHERE recipeNutrition.recipeID = @recipeID;
+        END;
+//
+delimiter ;
 
 CREATE TABLE recipeCost (
     recipeID INT,
