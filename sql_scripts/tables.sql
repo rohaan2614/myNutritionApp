@@ -24,6 +24,12 @@ CREATE TABLE recipe (
     servings SMALLINT DEFAULT 1
 );
 
+CREATE TABLE recipeCost (
+    recipeID INT,
+    costPerServing DECIMAL(5, 2) DEFAULT 0.0,
+    CONSTRAINT FK_recipe_recipeCost FOREIGN KEY (recipeID) REFERENCES recipe(id)
+);
+
 CREATE TABLE recipeNutrition (
     recipeID INT,
     totalFat FLOAT DEFAULT 0.0,
@@ -48,6 +54,8 @@ CREATE TRIGGER newRecipe
         INTO @lastRecipeID;
 		INSERT INTO recipeNutrition (recipeID)
 					VALUES (@lastRecipeID);
+		INSERT INTO recipeCost (recipeID)
+					VALUES (@lastRecipeID);
 	END;
     //
 delimiter ;
@@ -62,7 +70,7 @@ CREATE TABLE recipeIngredient(
 );
 
 delimiter //
-CREATE TRIGGER updateRecipeNutrition 
+CREATE TRIGGER updateRecipeNutritionAndCost
 	AFTER INSERT 
     ON recipeIngredient 
     FOR EACH ROW
@@ -72,7 +80,7 @@ CREATE TRIGGER updateRecipeNutrition
         ORDER BY recipeID DESC
         LIMIT 1
         INTO @recipeID, @ingredientID, @ingredientQty;
-        -- fat content
+        -- nutritional values
         SELECT fat, protein, carbohydrates, sodium
         FROM ingredient
         WHERE id = @ingredientID
@@ -85,15 +93,17 @@ CREATE TRIGGER updateRecipeNutrition
 			recipeNutrition.totalCalories = (recipeNutrition.totalFat * 8) + 4 * (
 				recipeNutrition.totalProtein + recipeNutrition.totalCarbs)
         WHERE recipeNutrition.recipeID = @recipeID;
+        -- cost
+        SELECT cost/servings
+        FROM ingredient
+        WHERE id = @ingredientID
+        INTO @ingredientUnitPrice;
+        UPDATE recipeCost
+		SET recipeCost.costPerServing = recipeCost.costPerServing + (@ingredientUnitPrice * @ingredientQty)
+		WHERE recipeCost.recipeID = @recipeID;
         END;
 //
 delimiter ;
-
-CREATE TABLE recipeCost (
-    recipeID INT,
-    costPerServing DECIMAL(5, 2),
-    CONSTRAINT FK_recipe_recipeCost FOREIGN KEY (recipeID) REFERENCES recipe(id)
-);
 
 -- TEST DB 
 INSERT INTO
@@ -139,34 +149,32 @@ VALUES
         'https://www.walmart.com/ip/Nutella-Hazelnut-Spread-with-Cocoa-for-Breakfast-Great-for-Holiday-Baking-26-5-oz-Jar/14574564'
     );
 
-INSERT INTO
-    recipe (name)
+INSERT INTO 
+recipe (name)
 VALUES
     ('Peanut Butter-Nutella Sandwich');
 
-SELECT
-    *
-FROM
-    ingredient;
+SELECT * 
+FROM ingredient;
 
-SELECT
-    *
-FROM
-    recipe;
+SELECT *
+FROM recipe;
 
-INSERT INTO
-    recipeIngredient
+INSERT INTO recipeIngredient
 VALUES
     (1, 1, 2),
     (1, 2, 3),
     (1, 3, 1);
 
-SELECT
-    *
-FROM
-    recipeIngredient;
+SELECT *
+FROM recipeIngredient;
 
-SELECT
-    *
-FROM
-    recipeNutrition;
+SELECT recipeID AS "Recipe ID", name AS "Recipe Name", totalFat AS "Total Fats (g)", totalProtein AS "Total Proteins (g)", totalCarbs AS "Total Carbohydrates (g)", totalCalories AS "Total Calories"
+FROM recipeNutrition
+JOIN recipe 
+ON recipe.id = recipeNutrition.recipeID;
+    
+SELECT recipeID AS "Recipe ID", name AS "Recipe Name", costPerServing AS "Cost Per Serving ($)" 
+FROM recipeCost
+JOIN recipe 
+ON recipe.id = recipeCost.recipeID;
